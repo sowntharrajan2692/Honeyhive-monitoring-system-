@@ -1,0 +1,84 @@
+#include <Arduino.h>
+#include <LiquidCrystal_I2C.h>
+#include <HX711.h>
+#include <DHT.h>
+
+// LCD Setup
+LiquidCrystal_I2C lcd(0x27, 16, 2); // Set the LCD address to 0x27 for a 16 chars and 2 line display
+
+// HX711 Setup
+const int LOADCELL_DOUT_PIN = 16;
+const int LOADCELL_SCK_PIN = 4;
+HX711 scale;
+
+// DHT Setup
+#define DHTPIN 23  // Digital pin connected to the DHT sensor
+#define DHTTYPE DHT11  // DHT 22 (AM2302)
+DHT dht(DHTPIN, DHTTYPE);
+
+// Sound Setup
+const int microphonePin = 13; // DGPIO 13 pin on ESP32
+
+void setup() {
+  Serial.begin(115200);
+
+  // Initialize LCD
+  lcd.init();
+  lcd.clear();
+  lcd.backlight(); // Make sure backlight is on
+
+  // Initialize HX711
+  scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
+  scale.set_scale(208.95);//INSERT_YOUR_CALIBRATION_FACTOR
+  scale.tare();
+
+  // Initialize DHT sensor
+  dht.begin();
+}
+
+void loop() {
+  // Read temperature and humidity
+  float humidity = dht.readHumidity();
+  float temperatureCelsius = dht.readTemperature();
+  float temperatureFahrenheit = dht.readTemperature(true);
+
+  // Read sound level
+  int soundValue = analogRead(microphonePin);
+  float voltage = soundValue * (3.3 / 4095); // Assuming 3.3V is the reference voltage
+  float decibels = 20 * log10(voltage / 0.00002); // 0.00002 is the reference voltage for sound level
+
+  // Read weight
+  float weight = scale.get_units(5);
+
+  // Print values to serial monitor
+  Serial.print("Temperature (C): ");
+  Serial.println(temperatureCelsius);
+  Serial.print("Temperature (F): ");
+  Serial.println(temperatureFahrenheit);
+  Serial.print("Humidity (%): ");
+  Serial.println(humidity);
+  Serial.print("Sound Level (dB): ");
+  Serial.println(decibels);
+  Serial.print("Weight (g): ");
+  Serial.println(weight);
+
+  // Display values on LCD
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Temp: ");
+  lcd.print(temperatureCelsius);
+  lcd.print(" C");
+  lcd.setCursor(0, 1);
+  lcd.print("Humidity: ");
+  lcd.print(humidity);
+  lcd.print("%");
+  delay(2500);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Sound(dB): ");
+  lcd.print(decibels);
+  lcd.setCursor(0, 1);
+  lcd.print("Weight (g): ");
+  lcd.print(weight);
+  delay(2500); // Adjust delay based on your application needs
+}
